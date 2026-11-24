@@ -1,0 +1,15 @@
+[Unit]
+Description=Antigravity Telegram Bridge Daemon
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Project/antigravity-telegram-bridge
+ExecStart=%h/Project/antigravity-telegram-bridge/venv/bin/python bot.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

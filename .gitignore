@@ -1,0 +1,21 @@
+# Environment variables
+.env
+
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+
+# Temporary execution artifacts
+tmp/
+*.tmp
+
+# Operating system files
+.DS_Store
+Thumbs.db
