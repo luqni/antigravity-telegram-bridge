@@ -1,6 +1,6 @@
 """
 Subprocess executor for Google Antigravity (agy) CLI.
-Handles command construction, timeouts, ANSI stripping, and JSON output parsing.
+Handles command construction, timeouts, ANSI stripping, JSON output parsing, and dry-run plan mode.
 """
 
 import json
@@ -12,6 +12,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Any
+
+import config
 
 # Regex to strip ANSI escape codes (colors, spinners, terminal codes)
 ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -36,10 +38,11 @@ class ExecutionResult:
     error: Optional[str] = None
     raw_stdout: str = ""
     raw_stderr: str = ""
+    is_plan: bool = False
 
 
 class AgyExecutor:
-    """Executes agy CLI commands non-interactively with session continuity."""
+    """Executes agy CLI commands non-interactively with session continuity and dry-run planning."""
 
     def __init__(self, binary_path: str, default_timeout: int = 300):
         self.binary_path = binary_path
@@ -53,10 +56,12 @@ class AgyExecutor:
         model: Optional[str] = None,
         timeout: Optional[int] = None,
         image_path: Optional[str] = None,
+        is_plan_mode: bool = False,
     ) -> ExecutionResult:
         """
         Execute a prompt using agy CLI.
-        Supports multi-turn conversations via conversation_id and visual inputs via image_path.
+        Supports multi-turn conversations via conversation_id, visual inputs via image_path,
+        and Dry-Run / Plan Mode via is_plan_mode.
         """
         start_time = time.time()
         actual_timeout = timeout or self.default_timeout
@@ -69,6 +74,10 @@ class AgyExecutor:
                 final_prompt = f"Please inspect and analyze this attached image/screenshot: {abs_img}"
             else:
                 final_prompt = f"[Attached Image: {abs_img}]\n\n{final_prompt}"
+
+        # Inject dry-run planning prefix if requested
+        if is_plan_mode:
+            final_prompt = f"{config.PLAN_PROMPT_PREFIX}{final_prompt}"
 
         # Build command arguments
         cmd = [
@@ -119,6 +128,7 @@ class AgyExecutor:
                     error=f"⏱️ Execution timed out after {actual_timeout} seconds.",
                     raw_stdout=strip_ansi(raw_stdout),
                     raw_stderr=strip_ansi(raw_stderr),
+                    is_plan=is_plan_mode,
                 )
 
             duration = time.time() - start_time
@@ -145,6 +155,7 @@ class AgyExecutor:
                         error=None if proc.returncode == 0 else clean_stderr,
                         raw_stdout=clean_stdout,
                         raw_stderr=clean_stderr,
+                        is_plan=is_plan_mode,
                     )
                 except json.JSONDecodeError:
                     # Output was not JSON, fallback to raw text parsing
@@ -159,6 +170,7 @@ class AgyExecutor:
                     duration_seconds=round(duration, 2),
                     raw_stdout=clean_stdout,
                     raw_stderr=clean_stderr,
+                    is_plan=is_plan_mode,
                 )
             else:
                 err_msg = clean_stderr or clean_stdout or f"Process exited with code {proc.returncode}"
@@ -170,6 +182,7 @@ class AgyExecutor:
                     error=err_msg,
                     raw_stdout=clean_stdout,
                     raw_stderr=clean_stderr,
+                    is_plan=is_plan_mode,
                 )
 
         except FileNotFoundError:
@@ -182,6 +195,7 @@ class AgyExecutor:
                     f"❌ Antigravity CLI (`agy`) binary was not found at `{self.binary_path}`.\n"
                     f"Please make sure Google Antigravity CLI is installed and added to your PATH."
                 ),
+                is_plan=is_plan_mode,
             )
         except Exception as e:
             duration = time.time() - start_time
@@ -190,4 +204,5 @@ class AgyExecutor:
                 response="",
                 duration_seconds=duration,
                 error=f"❌ Internal execution error: {str(e)}",
+                is_plan=is_plan_mode,
             )

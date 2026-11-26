@@ -2,24 +2,29 @@
 
 Jembatan ringan, aman, dan modular untuk menghubungkan Telegram Bot dengan Google Antigravity (`agy`) CLI.
 
-Proyek ini memungkinkan Anda mengoperasikan agen kecerdasan buatan Antigravity langsung melalui ruang obrolan Telegram dari ponsel maupun desktop tanpa perlu menyentuh terminal secara langsung.
+Proyek ini memungkinkan Anda mengoperasikan agen kecerdasan buatan Antigravity langsung melalui ruang obrolan Telegram dari ponsel maupun desktop tanpa perlu membuka terminal atau koneksi SSH.
 
 ---
 
-## 🌟 Fitur Utama
+## 🌟 Fitur Utama (v1.1)
 
-- **Otorisasi Ketat (Admin Whitelist)**: Hanya akun Telegram pemilik (User ID terverifikasi) yang dapat memberikan instruksi dan perintah.
-- **Percakapan Bersambung (Multi-Turn Continuity)**: Menjaga konteks percakapan secara dinamis menggunakan engine sesi bawaan Antigravity (`--conversation <id>`).
-- **Dukungan Gambar (Vision Support)**: Kirimkan tangkapan layar (screenshot) kode, antarmuka, atau log terminal untuk dianalisis langsung oleh agen.
-- **Navigasi Folder Cepat**: Berpindah direktori proyek dengan mudah menggunakan perintah `/cd`.
-- **Pemantauan Host Real-time**: Periksa konsumsi RAM, CPU, kapasitas penyimpanan, dan status CLI lewat `/status`.
-- **Format Bersih (Smart Chunking)**: Pemotongan pesan otomatis dan lampiran dokumen `.txt` jika keluaran terminal melebihi batas karakter Telegram.
+- **🛡️ Interaktif Human-in-the-Loop (Inline Approval)**: Menampilkan tombol interaktif `[✅ Setujui]`, `[📋 Plan / Dry-Run]`, dan `[❌ Batalkan]` sebelum perintah dieksekusi ke sistem.
+- **⏱️ Fail-Secure / Default-Deny Timeout**: Jika instruksi didiamkan tanpa respons dalam batas waktu (default: 3 menit / 180 detik), sistem secara otomatis membatalkan eksekusi demi keamanan host.
+- **🔁 Resumable Execution (Lanjutkan Kapan Saja)**: Saat timeout atau pembatalan terjadi, status checkpoint tersimpan di memori. Pengguna cukup menekan tombol `[🔁 Resume / Lanjutkan]` saat membuka ponsel kembali tanpa perlu mengetik ulang prompt dari awal.
+- **🎛️ Saklar Mode Keamanan Fleksibel (`/safety`)**: Beralih instan antara **Mode Ketat (Strict/Guarded)** yang meminta konfirmasi dan **Mode Bebas (Direct)** untuk eksekusi instan tanpa hambatan.
+- **📋 Mode Rencana / Dry-Run (`/plan`)**: Meminta agen merumuskan langkah-langkah kerja dan analisis dampak risiko sistem terlebih dahulu tanpa langsung memodifikasi kode atau berkas.
+- **🔒 Otorisasi Ketat (Admin Whitelist)**: Hanya akun Telegram terverifikasi (`ALLOWED_USER_IDS`) yang memiliki wewenang mengontrol bridge.
+- **💬 Percakapan Bersambung (Multi-Turn Continuity)**: Menjaga konteks percakapan secara dinamis menggunakan engine sesi bawaan Antigravity (`--conversation <id>`).
+- **📸 Dukungan Gambar (Vision Support)**: Kirimkan tangkapan layar (*screenshot*) kode, antarmuka, atau log galat untuk dianalisis langsung oleh agen.
+- **📂 Navigasi Folder Cepat**: Berpindah direktori proyek dengan mudah menggunakan perintah `/cd <path>` atau kembali dengan `/cd ..`.
+- **📊 Pemantauan Host Real-time**: Periksa konsumsi RAM, CPU, kapasitas penyimpanan, dan status agen lewat `/status`.
+- **📑 Format Bersih (Smart Chunking)**: Pemotongan pesan otomatis dan lampiran dokumen `.txt` jika keluaran terminal melebihi batas karakter Telegram.
 
 ---
 
-## 🏗️ Detail Arsitektur Sistem
+## 🏗️ Detail Arsitektur Sistem (v1.1)
 
-Sistem ini dibangun dengan pendekatan modular 4-lapisan (*4-tier architecture*) yang memisahkan antara antarmuka pengguna, pemrosesan pesan, eksekusi CLI, dan ruang kerja lokal.
+Sistem dibangun dengan arsitektur 4-lapisan (*4-tier architecture*) yang diperkaya dengan **Safety & Approval Guard Layer**:
 
 ### Diagram Alur Arsitektur
 
@@ -28,7 +33,7 @@ Sistem ini dibangun dengan pendekatan modular 4-lapisan (*4-tier architecture*) 
 │         📱 Developer Phone / Desktop Client            │
 │                 (Telegram Messenger)                   │
 └───────────────────────────┬────────────────────────────┘
-                            │ HTTPS (Long-Polling / Webhook)
+                            │ HTTPS (Long-Polling)
                             ▼
 ┌────────────────────────────────────────────────────────┐
 │  🤖 LAPISAN 1: GATEWAY & AUTH GUARD (bot.py)           │
@@ -36,27 +41,36 @@ Sistem ini dibangun dengan pendekatan modular 4-lapisan (*4-tier architecture*) 
 │  • User Session Mapping (User ID ➔ Conversation ID)    │
 │  • Workspace State Management (/cd, /pwd)              │
 │  • Visual Input Handling (Temporary Image Downloader)  │
-│  • Smart Chunking (> 4000 chars & File Attachment)     │
 └───────────────────────────┬────────────────────────────┘
-                            │ Python IPC / Popen
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│  🛡️ LAPISAN 1.5: SAFETY GUARD & APPROVAL ENGINE        │
+│  • Dynamic Safety Switch (/safety: Strict vs Direct)   │
+│  • Inline Approval Card ([Approve] [Plan] [Reject])    │
+│  • Fail-Secure Default-Deny Timer (180s Auto-Cancel)   │
+│  • Resumable Checkpoint Queue ([🔁 Resume Button])     │
+└───────────────────────────┬────────────────────────────┘
+                            │ Approved / Direct Trigger
                             ▼
 ┌────────────────────────────────────────────────────────┐
 │  ⚡ LAPISAN 2: CLI SUBPROCESS ENGINE (executor.py)     │
+│  • Dry-Run Plan Mode Formatter (/plan prefix injection)│
 │  • Safe Argument Construction & Shell Sanitization     │
 │  • Parameter: -p, --output-format json, --dangerously  │
 │  • Multi-Turn Continuity Injection (--conversation)    │
 │  • JSON Payload Parsing (Status, Usage, Duration)      │
 │  • ANSI Terminal Escape Sequence Stripper              │
-│  • Timeout Guard (Kill Process on Hang)                │
+│  • Execution Timeout Guard (Kill Process on Hang)      │
 └───────────────────────────┬────────────────────────────┘
                             │ Subprocess Fork
                             ▼
 ┌────────────────────────────────────────────────────────┐
 │  🪐 LAPISAN 3: GOOGLE ANTIGRAVITY ENGINE (agy binary)  │
-│  • Agentic AI Reasoning & Planning                     │
+│  • Agentic AI Reasoning, Planning & Vision Analysis    │
 │  • Automated Tool Calling (Read, Edit, Run Command)    │
 └───────────────────────────┬────────────────────────────┘
-                            │ Read / Write / Shell
+                            │ Local OS File I/O
                             ▼
 ┌────────────────────────────────────────────────────────┐
 │  📁 LAPISAN 4: LOCAL WORKSPACE & SYSTEM ENVIRONMENT    │
@@ -64,27 +78,6 @@ Sistem ini dibangun dengan pendekatan modular 4-lapisan (*4-tier architecture*) 
 │  • Host System Resources (CPU, Memory, Disk)           │
 └────────────────────────────────────────────────────────┘
 ```
-
-### Rincian Komponen Arsitektur
-
-1. **Lapisan Gerbang & Keamanan (`bot.py`)**:
-   - **Authentication Middleware**: Menggunakan decorator `@require_auth` untuk memvalidasi numeric User ID setiap pesan masuk terhadap daftar `ALLOWED_USER_IDS`. Pesan dari pengguna tidak dikenal langsung ditolak.
-   - **Session State Isolation**: Menyimpan pemetaan `user_id -> conversation_id` di memori dengan penguncian thread (*thread lock*), memastikan percakapan setiap admin terisolasi.
-   - **Continuous Typing Feedback**: Menjalankan thread terpisah yang mengirim sinyal status *"typing..."* ke Telegram setiap 4 detik agar pengguna mengetahui agen sedang memproses tugas.
-   - **Smart Message Formatter**: Membagi respon panjang menjadi beberapa potongan pesan jika panjang teks 4.000–12.000 karakter, atau mengirimkan dokumen `.txt` jika teks melampaui 12.000 karakter agar obrolan tetap rapi.
-
-2. **Lapisan Eksekusi Subprocess (`executor.py`)**:
-   - **Non-Interactive Execution**: Memanggil binary `agy` menggunakan mode `-p "<prompt>"` dan `--dangerously-skip-permissions` untuk automasi tanpa hambatan interaktif terminal.
-   - **Structured JSON Parsing**: Mengaktifkan `--output-format json` untuk menangkap metadata eksekusi secara terstruktur: waktu durasi (`duration_seconds`), total token pemakaian (`usage`), status eksekusi, serta ID sesi percakapan baru.
-   - **Sanitasi Terminal**: Menghapus seluruh karakter ANSI escape (`\x1b[...]`) agar teks keluaran terminal dapat ditampilkan bersih di layar ponsel tanpa karakter aneh.
-   - **Timeout Protection**: Mengawasi durasi kerja subprocess dengan batas waktu (`TIMEOUT_SECONDS`). Bila terjadi *deadlock*, proses akan dihentikan secara aman (`proc.kill()`).
-
-3. **Lapisan Konfigurasi & Lingkungan (`config.py`)**:
-   - **Auto-Discovery Binary**: Mendeteksi lokasi binary `agy` secara otomatis pada `PATH`, `~/.local/bin/agy`, `/usr/local/bin/agy`, atau path manual yang didefinisikan pada `.env`.
-   - **Path Normalization**: Menangani konversi path direktori relatif, absolut, dan ekspansi tilde (`~`) untuk memastikan keamanan eksekusi perintah direktori.
-
-4. **Lapisan Layanan Background (`antigravity-bridge.service`)**:
-   - Menyediakan konfigurasi service *Systemd User Unit* sehingga bot dapat berjalan otomatis saat server/laptop menyala (*boot on startup*) dan melakukan *auto-restart* jika terjadi kendala jaringan.
 
 ---
 
@@ -124,6 +117,12 @@ WORKING_DIR=/home/user/projects
 
 # Batas waktu maksimal eksekusi perintah (detik)
 TIMEOUT_SECONDS=300
+
+# Mode keamanan default (strict = butuh konfirmasi, direct = eksekusi instan)
+DEFAULT_SAFETY_MODE=strict
+
+# Timeout persetujuan fail-secure (detik)
+APPROVAL_TIMEOUT_SECONDS=180
 ```
 
 ### 4. Menjalankan Bot
@@ -136,15 +135,18 @@ TIMEOUT_SECONDS=300
 
 ## 📱 Daftar Perintah Telegram
 
-| Perintah | Fungsi |
+| Perintah | Deskripsi |
 | :--- | :--- |
-| `/start` | Menampilkan ringkasan awal, direktori aktif, dan status bot |
-| `/help` | Panduan lengkap tata cara penggunaan perintah |
+| `/start` | Menampilkan ringkasan awal, mode keamanan, direktori kerja, dan status bot |
+| `/safety [mode]` | Mengubah mode keamanan antara `strict` (Mode Ketat) dan `direct` (Mode Bebas) |
+| `/plan <tugas>` | Menjalankan simulasi kerja (Dry-Run Plan) tanpa modifikasi berkas |
+| `/resume` | Melanjutkan instruksi yang sebelumnya dibatalkan atau mengalami timeout |
+| `/help` | Panduan lengkap tata cara penggunaan seluruh perintah |
 | `/newchat` (atau `/reset`) | Mereset konteks percakapan dan memulai sesi baru |
 | `/cd <folder>` | Berpindah ke direktori proyek tujuan |
 | `/pwd` | Menampilkan path direktori kerja yang sedang aktif |
-| `/status` | Menampilkan beban CPU, memori RAM, kapasitas disk, dan versi agy |
-| `/model <nama>` | Mengganti atau melihat model kecerdasan buatan aktif |
+| `/status` | Menampilkan beban CPU, memori RAM, kapasitas disk, dan status agen |
+| `/model <nama>` | Mengganti atau memeriksa model AI yang sedang digunakan |
 
 ---
 

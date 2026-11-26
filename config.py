@@ -52,6 +52,36 @@ try:
 except ValueError:
     TIMEOUT_SECONDS = 300
 
+# Safety & Confirmation Settings (v1.1)
+# DEFAULT_SAFETY_MODE can be "strict" (requires inline approval) or "direct" (immediate execution)
+DEFAULT_SAFETY_MODE = os.getenv("DEFAULT_SAFETY_MODE", "strict").strip().lower()
+if DEFAULT_SAFETY_MODE not in ("strict", "direct"):
+    DEFAULT_SAFETY_MODE = "strict"
+
+# Approval timeout for Fail-Secure / Default-Deny (default: 180s = 3 minutes)
+try:
+    APPROVAL_TIMEOUT_SECONDS = int(os.getenv("APPROVAL_TIMEOUT_SECONDS", "180"))
+except ValueError:
+    APPROVAL_TIMEOUT_SECONDS = 180
+
+# Maximum resumable tasks remembered in memory per user
+try:
+    MAX_RESUME_HISTORY = int(os.getenv("MAX_RESUME_HISTORY", "10"))
+except ValueError:
+    MAX_RESUME_HISTORY = 10
+
+# Dry-run / Plan Prompt Prefix
+PLAN_PROMPT_PREFIX = os.getenv(
+    "PLAN_PROMPT_PREFIX",
+    (
+        "You are operating in DRY-RUN / PLAN MODE. "
+        "Analyze the following request and formulate a comprehensive, step-by-step execution plan "
+        "and risk/impact assessment. "
+        "DO NOT execute file modifications, destructive shell commands, or mutation actions yet. "
+        "Present the planned steps clearly to the user for review:\n\n"
+    ),
+)
+
 # Path to agy executable
 _custom_agy_path = os.getenv("AGY_PATH", "").strip()
 
